@@ -60,7 +60,6 @@ const fetchQuestions = (client) => {
  *      newbie if this answers their question
  *    - If no direct match, turns question into keywords, and returns all
  *      questions with a matching keyword (sorted by highest no. of matches).
- *    -
  *    - If no matches, logs question as an unanswered question
  * @param  {[type]} bot      [description]
  * @param  {[type]} question [description]
@@ -71,37 +70,9 @@ function respondToQuestion(bot, question){
 }
 
 /**
- * takes the newbie's question and attempts to match directly to a listed
- * question. If a direct match is found, return the corresponding answer.
- * Otherwise, return false.
- * @param  {string} question  The newbie's question
- * @return {object} response  Returns a boolean answerStatus, and an optional
- *                            answer message.
- */
-function getDirectMatch(question, questionsStore){
-  const response = {
-    answerStatus: false,
-    answer: ''
-  };
-  const noobieQn = parseSentence(question.text);
-
-  questionsStore.map((dbQn) => {
-
-    const storeQn = parseSentence(dbQn.question);
-
-    if (storeQn === noobieQn){
-      response.answerStatus = true;
-      response.answer = dbQn.response;
-    }
-  });
-
-  return response;
-}
-
-/**
  * Utility to parse sentence into a usable format
- * @param  {string} sentence    a sentence that needs depunctuating
- * @return {[type]}             [description]
+ * @param  {string} sentence    a sentence that needs parsing
+ * @return {string} parsed      the parsed sentence
  */
 function parseSentence(sentence){
   const PUNCTUATION   = /[.,\/#!$%\^&\*;:{}=\-_`~()?]/g;
@@ -133,10 +104,84 @@ function getKeywords(question){
   return keywords;
 }
 
+/**
+ * takes the newbie's question and attempts to match directly to a listed
+ * question. If a direct match is found, return the corresponding answer.
+ * Otherwise, return false.
+ * @param  {string} question        The newbie's question
+ * @param  {array} questionsStore   The fetched questions from the CMS
+ * @return {object} response        Returns a boolean answerStatus, and an
+ *                                  optional answer message.
+ */
+function getDirectMatch(question, questionsStore){
+  const response = {
+    answerStatus: false,
+    answer: ''
+  };
+  const noobieQn = parseSentence(question.text);
+
+  questionsStore.map((dbQn) => {
+
+    const storeQn = parseSentence(dbQn.question);
+
+    if (storeQn === noobieQn){
+      response.answerStatus = true;
+      response.answer = dbQn.response;
+    }
+  });
+
+  return response;
+}
+
+/**
+ * Takes an array of keywords, and iterates over the questions store
+ * to find a question that has matching keywords
+ * @param  {array} keywords         The asked question's keywords
+ * @param  {object} questionsStore  The fetched questions from the CMS
+ * @return {object} keywordMatches  A response object with a status and an
+ *                                  optional array of matching response objects
+ */
+function getKeywordMatches(keywords, questionsStore){
+  const keywordMatches = {
+    answerStatus: false,
+    answers: []
+  };
+
+  const askedSet = new Set(keywords);
+
+  questionsStore.map((dbQn) => {
+
+    const dbKeywords = dbQn.keywords.map((word) => {
+      return word.toLowerCase();
+    });
+
+    const matches = new Set(dbKeywords.filter(x => askedSet.has(x)));
+
+    if ([...matches].length) {
+      dbQn.matches = [...matches];
+      keywordMatches.answers.push(dbQn);
+    }
+
+  });
+
+  keywordMatches.answerStatus = !!(keywordMatches.answers.length > 0);
+
+  // sort the answers by length of matching keywords
+  if (keywordMatches.answerStatus){
+    keywordMatches.answers.sort((a,b) => {
+      return b.matches.length - a.matches.length;
+    });
+  }
+
+  console.log(keywordMatches);
+
+  return keywordMatches;
+}
+
 function init(){
 
   const controller = BotKit.slackbot({
-    debug: true,
+    debug: false,
   });
 
   const nooBot = controller.spawn({
@@ -158,9 +203,14 @@ function init(){
 
     if (directMatch.answerStatus){
       response = directMatch.answer;
-    } else if (false) {
-      // this is where we'd strip out all filler words, and test for keyword matches
     } else {
+      let keywords = getKeywords(message.text);
+      let keywordMatches = getKeywordMatches(keywords, questionsStore);
+
+      if (keywordMatches.answerStatus){
+
+      }
+
       // TODO: turn this into a fallback function
       response = `Well this is embarassing, but I don't know the answer to that! Try rephrasing your question, or asking ${FALLBACK_CONTACT}`;
     }
