@@ -1,3 +1,5 @@
+"use strict";
+
 const BotKit        = require('botkit');
 const fs            = require('fs');
 const readline      = require('readline');
@@ -6,7 +8,7 @@ const contentful    = require('contentful-management');
 const FILLER_WORDS  = ['for','and','nor','but','or','yet','so','after','although','as','because',
 'before','even','if','once','now','that','since','though','unless','until',
 'when','where','while','such', 'this', 'is', 'a', 'an', 'some', 'hey', 'hi',
-'uh', 'hello', 'um', 'what', 'hiya', 'ok', 'there', ''];
+'uh', 'hello', 'um', 'what', 'hiya', 'ok', 'there', 'noobot'];
 
 // SLACK CONSTS
 const DM                 = 'direct_message';
@@ -81,11 +83,11 @@ function getDirectMatch(question, questionsStore){
     answerStatus: false,
     answer: ''
   };
-  const noobieQn = depunctuate(question.text);
+  const noobieQn = parseSentence(question.text);
 
   questionsStore.map((dbQn) => {
 
-    const storeQn = depunctuate(dbQn.question);
+    const storeQn = parseSentence(dbQn.question);
 
     if (storeQn === noobieQn){
       response.answerStatus = true;
@@ -97,17 +99,18 @@ function getDirectMatch(question, questionsStore){
 }
 
 /**
- * Utility to remove punctuation from a sentence
+ * Utility to parse sentence into a usable format
  * @param  {string} sentence    a sentence that needs depunctuating
  * @return {[type]}             [description]
  */
-function depunctuate(sentence){
+function parseSentence(sentence){
   const PUNCTUATION   = /[.,\/#!$%\^&\*;:{}=\-_`~()?]/g;
   const MULTISPACE    = /[\s]{2,}/g;
   const depunctuated  = sentence.replace(PUNCTUATION, " ")
                         .replace(MULTISPACE, " ").trim();
+  const parsed        = depunctuated.toLowerCase();
 
-  return depunctuated;
+  return parsed;
 }
 
 /**
@@ -118,7 +121,7 @@ function depunctuate(sentence){
  */
 function getKeywords(question){
   let keywords = [];
-  let words = depunctuate(question).split(' ');
+  let words = parseSentence(question).split(' ');
 
   words.map((word) => {
     if (FILLER_WORDS.indexOf(word) !== -1){
@@ -133,8 +136,9 @@ function getKeywords(question){
 function init(){
 
   const controller = BotKit.slackbot({
-    debug: false,
+    debug: true,
   });
+
   const nooBot = controller.spawn({
     token: process.env.SLACKBOT_TOKEN
   }).startRTM();
@@ -147,7 +151,7 @@ function init(){
   const questionsStore = fetchQuestions(client);
 
 
-  controller.on([AT_MENTION, SUB_MENTION, AMBIENT, DM], (bot, message) => {
+  controller.on([AT_MENTION, DM], (bot, message) => {
 
     let directMatch = getDirectMatch(message,questionsStore);
     let response;
@@ -163,6 +167,11 @@ function init(){
 
     bot.replyWithTyping(message, response);
 
+  });
+
+  controller.on([SUB_MENTION], (bot, message) => {
+    // if someone mentions noobot, reply to that person and see
+    // if they need help (don't reply public)
   });
 
 }
