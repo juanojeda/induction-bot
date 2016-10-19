@@ -18,10 +18,14 @@ const AMBIENT            = 'ambient';
 const CREATE             = 'create_bot';
 const TEST_CHANNEL       = 'G2M18SVDM';
 const FALLBACK_CONTACT   = '<@U055VEZUR>';
+const RESPONSE_METHOD    = {'short': 2000, 'long': 5000}
 
 // CONTENTFUL CONSTS
 const SPACE_ID           = 'h2wyvxm6c7w0';
 const LANG               = 'en-GB';
+
+// STYLE STUFF
+const ANSWER_COLORS      = ['#6abf2d','#bfe560','#e9eeed']
 
 /**
  * Gets an array of all the questions from Contentful, in a useful format
@@ -173,8 +177,6 @@ function getKeywordMatches(keywords, questionsStore){
     });
   }
 
-  console.log(keywordMatches);
-
   return keywordMatches;
 }
 
@@ -200,6 +202,7 @@ function init(){
 
     let directMatch = getDirectMatch(message,questionsStore);
     let response;
+    let responseMethod = 'short';
 
     if (directMatch.answerStatus){
       response = directMatch.answer;
@@ -208,14 +211,36 @@ function init(){
       let keywordMatches = getKeywordMatches(keywords, questionsStore);
 
       if (keywordMatches.answerStatus){
+        let attachments = [];
+        keywordMatches.answers.map((answer, index) => {
+          let colorIndex = index > 2 ? 2 : index;
+          let answerHash = {
+            "title": answer.question,
+            "text": answer.response,
+            "color": ANSWER_COLORS[colorIndex]
+          };
+          attachments.push(answerHash);
+        });
 
+        if (attachments.length > 1){
+          responseMethod = 'long';
+        }
+
+        response = {
+          "text": `Here's what I found...`,
+          "attachments": attachments
+        }
+      } else {
+        // TODO: turn this into a fallback function
+        response = `Well this is embarassing, but I don't know the answer to that! Try rephrasing your question, or asking ${FALLBACK_CONTACT}`;
       }
 
-      // TODO: turn this into a fallback function
-      response = `Well this is embarassing, but I don't know the answer to that! Try rephrasing your question, or asking ${FALLBACK_CONTACT}`;
     }
 
-    bot.replyWithTyping(message, response);
+    bot.startTyping(message);
+    setTimeout(() => {
+      bot.reply(message, response);
+    }, RESPONSE_METHOD[responseMethod]);
 
   });
 
