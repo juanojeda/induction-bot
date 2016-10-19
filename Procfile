@@ -1,2 +1,2 @@
- web: bin/web
- worker: bin/worker
+# web: bin/web
+# worker: bin/worker
