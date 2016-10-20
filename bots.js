@@ -245,8 +245,8 @@ function init(){
   });
 
   controller.on([SUB_MENTION], (bot, message) => {
-    // if someone mentions noobot, reply to that person and see
-    // if they need help (don't reply public)
+    console.log(message);
+    bot.replyPrivate(message, `hey <@${message.user}>, did you have a question I can help you with?`);
   });
 
 }
