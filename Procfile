@@ -1,2 +1,2 @@
 # web: bin/web
-# worker: bin/worker
+worker: node bots.js
