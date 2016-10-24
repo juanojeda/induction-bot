@@ -4,6 +4,7 @@ const BotKit        = require('botkit');
 const fs            = require('fs');
 const readline      = require('readline');
 const contentful    = require('contentful-management');
+const Promise       = require('promise');
 
 const FILLER_WORDS  = ['for','and','nor','but','or','yet','so','after','although','as','because',
 'before','even','if','once','now','that','since','though','unless','until',
@@ -18,11 +19,15 @@ const AMBIENT            = 'ambient';
 const CREATE             = 'create_bot';
 const TEST_CHANNEL       = 'G2M18SVDM';
 const FALLBACK_CONTACT   = '<@U055VEZUR>';
-const RESPONSE_METHOD    = {'short': 2000, 'long': 5000}
+const RESPONSE_METHOD    = {'short': 100, 'long': 1000}
 
 // CONTENTFUL CONSTS
 const SPACE_ID           = 'h2wyvxm6c7w0';
 const LANG               = 'en-GB';
+
+const CMS = contentful.createClient({
+  accessToken: process.env.CONTENTFUL_KEY
+});
 
 // STYLE STUFF
 const ANSWER_COLORS      = ['#6abf2d','#bfe560','#e9eeed']
@@ -33,29 +38,31 @@ const ANSWER_COLORS      = ['#6abf2d','#bfe560','#e9eeed']
 * @return {array}         an array of question objects
 */
 const fetchQuestions = (CMS) => {
-  let questions = [];
-  let isAllEntriesAdded = false;
 
-  CMS.getSpace(SPACE_ID)
+  let fetch = CMS.getSpace(SPACE_ID)
   .then( (space) => {
-    space.getEntries()
-    .then( (entries) => {
-      entries.items.map( (entry) => {
-        let question = {};
+    let entries = space.getEntries();
 
-        question.question = entry.fields.question[LANG];
-        question.keywords = entry.fields.keywords[LANG];
-        question.response = entry.fields.response[LANG];
-
-        questions.push(question);
-
-      });
-
-    })
+    return entries;
   });
 
-  return questions;
+  return fetch;
 }
+
+const parseQuestions = (entries) => {
+  let questions = [];
+  entries.items.map( (entry) => {
+    let question = {};
+
+    question.question = entry.fields.question[LANG];
+    question.keywords = entry.fields.keywords[LANG];
+    question.response = entry.fields.response[LANG];
+
+    questions.push(question);
+
+  });
+  return questions;
+};
 
 /**
 * response routine that runs the following algorithm:
@@ -69,54 +76,59 @@ const fetchQuestions = (CMS) => {
 * @param  {[type]} question [description]
 * @return {[type]}          [description]
 */
-function respondToQuestion(bot, message, questionsStore){
-
-  let directMatch = getDirectMatch(message,questionsStore);
-  let response;
-  let responseMethod = 'short';
-
-  if (directMatch.answerStatus){
-    response = directMatch.answer;
-  } else {
-    let keywords = getKeywords(message.text);
-    let keywordMatches = getKeywordMatches(keywords, questionsStore);
-
-    if (keywordMatches.answerStatus){
-      let attachments = [];
-      keywordMatches.answers.map((answer, index) => {
-        let colorIndex = index > 2 ? 2 : index;
-        let answerHash = {
-          "title": answer.question,
-          "text": answer.response,
-          "color": ANSWER_COLORS[colorIndex]
-        };
-        attachments.push(answerHash);
-      });
-
-      if (attachments.length > 1){
-        responseMethod = 'long';
-      }
-
-      response = {
-        "text": `Here's what I found...`,
-        "attachments": attachments
-      }
-    }
-    else {
-      response = {
-        "text": `I err... what's that again?`
-      }
-    }
-  }
-
-  let makeResponse = (message, response) => {
-    return () => {
-      bot.reply(message, response);
-    }
-  };
+function respondToQuestion(bot, message){
 
   bot.startTyping(message);
-  setTimeout(makeResponse(message, response), RESPONSE_METHOD[responseMethod]);
+
+  fetchQuestions(CMS)
+  .then((entries) => {
+    let questionsStore = parseQuestions(entries);
+    let response;
+    let directMatch = getDirectMatch(message,questionsStore);
+    let responseMethod = 'short';
+
+    if (directMatch.answerStatus){
+      response = directMatch.answer;
+    } else {
+      let keywords = getKeywords(message.text);
+      let keywordMatches = getKeywordMatches(keywords, questionsStore);
+
+      if (keywordMatches.answerStatus){
+        let attachments = [];
+        keywordMatches.answers.map((answer, index) => {
+          let colorIndex = index > 2 ? 2 : index;
+          let answerHash = {
+            "title": answer.question,
+            "text": answer.response,
+            "color": ANSWER_COLORS[colorIndex]
+          };
+          attachments.push(answerHash);
+        });
+
+        if (attachments.length > 1){
+          responseMethod = 'long';
+        }
+
+        response = {
+          "text": `Here's what I found...`,
+          "attachments": attachments
+        }
+      }
+      else {
+        response = {
+          "text": `I err... what's that again?`
+        }
+      }
+    }
+
+    let makeResponse = (message, response) => {
+      return () => {
+        bot.reply(message, response);
+      }
+    };
+    setTimeout(makeResponse(message, response), RESPONSE_METHOD[responseMethod]);
+
+  });
 }
 
 /**
@@ -233,10 +245,6 @@ function init(){
     debug: false,
   });
 
-  const CMS = contentful.createClient({
-    accessToken: process.env.CONTENTFUL_KEY
-  });
-
   const questionsStore = fetchQuestions(CMS);
 
   const nooBot = controller.spawn({
@@ -245,7 +253,7 @@ function init(){
 
   controller.on([AT_MENTION, DM], (bot, message) => {
 
-    respondToQuestion(bot, message, questionsStore);
+    respondToQuestion(bot, message);
 
   });
 
@@ -284,7 +292,7 @@ function init(){
                   return im.user === message.user;
                 });
                 newMsg.channel = userIm.id;
-                respondToQuestion(bot, newMsg, questionsStore);
+                respondToQuestion(bot, newMsg);
               });
 
             }

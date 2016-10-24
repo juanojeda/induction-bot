@@ -8,7 +8,8 @@
     "contentful-management": "^1.1.14",
     "foreman": "2.0.0",
     "google-auth-library": "^0.9.8",
-    "googleapis": "^14.0.0"
+    "googleapis": "^14.0.0",
+    "promise": "^7.1.1"
   },
   "devDependencies": {},
   "scripts": {
