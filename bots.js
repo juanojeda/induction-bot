@@ -57,16 +57,19 @@ function fetchQuestions(CMS){
               question.image = entry.fields.image[LANG];
             }
 
-            return cb(null, question);
-          } else {
-            return cb(null, null);
           }
 
+          return cb(null, question);
         };
 
-        async.map(entries.items, parseQuestion, (err, questions) => {
+        async.map(entries.items, parseQuestion, (err, questionsMap) => {
 
           if (err) throw err;
+
+          let questions = questionsMap.filter((question) => {
+            let isQuestionEmpty = Object.keys(question).length === 0;
+            return !isQuestionEmpty;
+          });
 
           resolve(questions);
         });
