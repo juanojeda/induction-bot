@@ -4,12 +4,12 @@
   "description": "this is the description",
   "main": "bots.js",
   "dependencies": {
+    "async": "^2.1.2",
     "botkit": "^0.4.0",
     "contentful-management": "^1.1.14",
     "foreman": "2.0.0",
     "google-auth-library": "^0.9.8",
-    "googleapis": "^14.0.0",
-    "promise": "^7.1.1"
+    "googleapis": "^14.0.0"
   },
   "devDependencies": {},
   "scripts": {

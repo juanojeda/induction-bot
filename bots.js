@@ -4,7 +4,7 @@ const BotKit        = require('botkit');
 const fs            = require('fs');
 const readline      = require('readline');
 const contentful    = require('contentful-management');
-const Promise       = require('promise');
+const async          = require('async');
 
 const FILLER_WORDS  = ['for','and','nor','but','or','yet','so','after','although','as','because',
 'before','even','if','once','now','that','since','though','unless','until',
@@ -37,32 +37,43 @@ const ANSWER_COLORS      = ['#6abf2d','#bfe560','#e9eeed']
 * @param  {object} CMS the contentful connection class
 * @return {array}         an array of question objects
 */
-const fetchQuestions = (CMS) => {
+function fetchQuestions(CMS){
 
-  let fetch = CMS.getSpace(SPACE_ID)
-  .then( (space) => {
-    let entries = space.getEntries();
+  let questionsPromise = new Promise((resolve, reject) => {
+    let fetch = CMS.getSpace(SPACE_ID)
+    .then( (space) => {
+      let entriesPromise = space.getEntries().then((entries) => {
 
-    return entries;
+        let parseQuestion = (entry, cb) => {
+
+          let question = {};
+
+          console.log(entry);
+
+          question.question = entry.fields.question[LANG];
+          question.keywords = entry.fields.keywords[LANG];
+          question.response = entry.fields.response[LANG];
+
+          if (entry.fields.image){
+            question.image = entry.fields.image[LANG];
+          }
+
+          return cb(null, question);
+        };
+
+        async.map(entries.items, parseQuestion, (err, questions) => {
+
+          if (err) throw err;
+
+          resolve(questions);
+        });
+
+      });
+    });
   });
 
-  return fetch;
+  return questionsPromise;
 }
-
-const parseQuestions = (entries) => {
-  let questions = [];
-  entries.items.map( (entry) => {
-    let question = {};
-
-    question.question = entry.fields.question[LANG];
-    question.keywords = entry.fields.keywords[LANG];
-    question.response = entry.fields.response[LANG];
-
-    questions.push(question);
-
-  });
-  return questions;
-};
 
 /**
 * response routine that runs the following algorithm:
@@ -78,11 +89,12 @@ const parseQuestions = (entries) => {
 */
 function respondToQuestion(bot, message){
 
-  bot.startTyping(message);
 
+  bot.startTyping(message);
   fetchQuestions(CMS)
-  .then((entries) => {
-    let questionsStore = parseQuestions(entries);
+  .then((questionsStore) => {
+
+
     let response;
     let directMatch = getDirectMatch(message,questionsStore);
     let responseMethod = 'short';
@@ -244,8 +256,6 @@ function init(){
   const controller = BotKit.slackbot({
     debug: false,
   });
-
-  const questionsStore = fetchQuestions(CMS);
 
   const nooBot = controller.spawn({
     token: process.env.SLACKBOT_TOKEN
