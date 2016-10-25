@@ -48,17 +48,20 @@ function fetchQuestions(CMS){
 
           let question = {};
 
-          console.log(entry);
+          if (entry.isPublished()){
+            question.question = entry.fields.question[LANG];
+            question.keywords = entry.fields.keywords[LANG];
+            question.response = entry.fields.response[LANG];
 
-          question.question = entry.fields.question[LANG];
-          question.keywords = entry.fields.keywords[LANG];
-          question.response = entry.fields.response[LANG];
+            if (entry.fields.image){
+              question.image = entry.fields.image[LANG];
+            }
 
-          if (entry.fields.image){
-            question.image = entry.fields.image[LANG];
+            return cb(null, question);
+          } else {
+            return cb(null, null);
           }
 
-          return cb(null, question);
         };
 
         async.map(entries.items, parseQuestion, (err, questions) => {
