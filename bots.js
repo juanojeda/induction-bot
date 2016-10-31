@@ -35,7 +35,7 @@ const ANSWER_COLORS      = ['#6abf2d','#bfe560','#e9eeed']
 /**
 * Gets an array of all the questions from Contentful, in a useful format
 * @param  {object} CMS the contentful connection class
-* @return {array}         an array of question objects
+* @return {promise}         a promise that resolves with the array of entries
 */
 function fetchQuestions(CMS){
 
@@ -82,19 +82,70 @@ function fetchQuestions(CMS){
 }
 
 /**
+ * Responds to a passive mention with a direct mention conversation to let the
+ * noobie know that noobot is there for assistance
+ * @param  {object} bot     the bot object
+ * @param  {object} message the message object
+ * @return n/a
+ */
+function respondToMention(bot, message){
+  bot.startPrivateConversation(
+    {
+      user: message.user
+    }, (err, convo) => {
+    if (err){
+      // do the error logging
+    } else {
+      convo.ask(`hey <@${message.user}>, did you have a question I can help you with?`, [
+        {
+          pattern: bot.utterances.yes,
+          callback: (response, convo) => {
+            convo.say(`Alright, hit me!`);
+            convo.next();
+          }
+        },
+        {
+          pattern: bot.utterances.no,
+          callback: (response, convo) => {
+            convo.say(`No probs!`);
+            convo.next();
+          }
+        },
+        {
+          default: true,
+          callback: (response, convo) => {
+            convo.next();
+            let newMsg = message;
+
+            bot.api.im.list({}, (error, data) => {
+              let userIm = data.ims.map((im) => {
+                return im.user === message.user;
+              });
+              newMsg.channel = userIm.id;
+              respondToQuestion(bot, newMsg);
+            });
+
+          }
+        }
+      ]);
+    }
+  });
+}
+
+/**
 * response routine that runs the following algorithm:
-*    - Tries to find a direct match for user's question
+*    - Fetches latest content from store
+*    - Tries to find a direct match for noobie's question
 *    - If there's a direct match, returns the corresponding answer, and asks
-*      newbie if this answers their question
+*      noobie if this answers their question
 *    - If no direct match, turns question into keywords, and returns all
 *      questions with a matching keyword (sorted by highest no. of matches).
 *    - If no matches, logs question as an unanswered question
-* @param  {[type]} bot      [description]
-* @param  {[type]} question [description]
-* @return {[type]}          [description]
+* @param  {object} bot      the bot object
+* @param  {string} question the noobie's question
+* @return n/a
 */
 function respondToQuestion(bot, message){
-
 
   bot.startTyping(message);
   fetchQuestions(CMS)
@@ -257,6 +308,22 @@ function getKeywordMatches(keywords, questionsStore){
   return keywordMatches;
 }
 
+/**
+ * Does all the event binding
+ * @return {object} The slackbot controller
+ */
+function bindEvents(controller){
+
+  controller.on([AT_MENTION, DM], (bot, message) => {
+    respondToQuestion(bot, message);
+  });
+
+  controller.on([SUB_MENTION], (bot, message) => {
+    respondToMention(bot, message);
+  });
+
+}
+
 function init(){
 
   const controller = BotKit.slackbot({
@@ -267,56 +334,7 @@ function init(){
     token: process.env.SLACKBOT_TOKEN
   }).startRTM();
 
-  controller.on([AT_MENTION, DM], (bot, message) => {
-
-    respondToQuestion(bot, message);
-
-  });
-
-  controller.on([SUB_MENTION], (bot, message) => {
-
-    bot.startPrivateConversation(
-      {
-        user: message.user
-      }, (err, convo) => {
-      if (err){
-        // do the error logging
-      } else {
-        convo.ask(`hey <@${message.user}>, did you have a question I can help you with?`, [
-          {
-            pattern: bot.utterances.yes,
-            callback: (response, convo) => {
-              convo.say(`Alright, hit me!`);
-              convo.next();
-            }
-          },
-          {
-            pattern: bot.utterances.no,
-            callback: (response, convo) => {
-              convo.say(`No probs!`);
-              convo.next();
-            }
-          },
-          {
-            default: true,
-            callback: (response, convo) => {
-              convo.next();
-              let newMsg = message;
-
-              bot.api.im.list({}, (error, data) => {
-                let userIm = data.ims.map((im) => {
-                  return im.user === message.user;
-                });
-                newMsg.channel = userIm.id;
-                respondToQuestion(bot, newMsg);
-              });
-
-            }
-          }
-        ]);
-      }
-    });
-  });
+  bindEvents(controller);
 
 }
 
