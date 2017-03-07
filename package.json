@@ -13,7 +13,8 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "nf run node bots.js"
+    "start": "nf run node bots.js",
+    "start:dev": "nf run -e .env,.dev node bots.js"
   },
   "repository": "repo",
   "author": "",

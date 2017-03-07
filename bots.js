@@ -1,8 +1,6 @@
 "use strict";
 
 const BotKit        = require('botkit');
-const fs            = require('fs');
-const readline      = require('readline');
 const contentful    = require('contentful-management');
 const async          = require('async');
 
@@ -19,15 +17,13 @@ const AMBIENT            = 'ambient';
 const CREATE             = 'create_bot';
 const TEST_CHANNEL       = 'G2M18SVDM';
 const FALLBACK_CONTACT   = '<@U055VEZUR>';
-const RESPONSE_METHOD    = {'short': 100, 'long': 1000}
+const RESPONSE_METHOD    = {'short': 100, 'long': 1000};
 
 // CONTENTFUL CONSTS
 const SPACE_ID           = 'h2wyvxm6c7w0';
 const LANG               = 'en-GB';
 
-const CMS = contentful.createClient({
-  accessToken: process.env.CONTENTFUL_KEY
-});
+const CMS = contentful;
 
 // STYLE STUFF
 const ANSWER_COLORS      = ['#6abf2d','#bfe560','#e9eeed']
@@ -326,13 +322,23 @@ function bindEvents(controller){
 
 function init(){
 
-  const controller = BotKit.slackbot({
-    debug: false,
-  });
+  let controller = {};
 
-  const nooBot = controller.spawn({
-    token: process.env.SLACKBOT_TOKEN
-  }).startRTM();
+  if (!process.env.DEV){
+    CMS.createClient({
+      accessToken: process.env.CONTENTFUL_KEY
+    });
+
+    controller = BotKit.slackbot({
+      debug: false,
+    });
+
+    controller.spawn({
+      token: process.env.SLACKBOT_TOKEN
+    }).startRTM();
+  }
+
+
 
   bindEvents(controller);
 
